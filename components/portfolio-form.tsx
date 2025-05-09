@@ -2,13 +2,16 @@
 
 import { useState } from "react"
 import { PlusCircle, Trash2 } from "lucide-react"
-
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { createPortfolio, type CreatePortfolioInput } from "@/app/actions/portfolio"
+import { useRouter } from "next/navigation"
 
-export function PortfolioForm({ onSubmit }) {
+export function PortfolioForm({ setShowCreateDialog }: { setShowCreateDialog: (show: boolean) => void }) {
+  const router = useRouter()
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -16,7 +19,7 @@ export function PortfolioForm({ onSubmit }) {
     holdings: [{ ticker: "", name: "", quantity: "", price: "", value: 0 }],
   })
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData({
       ...formData,
@@ -24,7 +27,7 @@ export function PortfolioForm({ onSubmit }) {
     })
   }
 
-  const handleHoldingChange = (index, field, value) => {
+  const handleHoldingChange = (index: number, field: string, value: string) => {
     const updatedHoldings = [...formData.holdings]
     updatedHoldings[index] = {
       ...updatedHoldings[index],
@@ -53,7 +56,7 @@ export function PortfolioForm({ onSubmit }) {
     })
   }
 
-  const removeHolding = (index) => {
+  const removeHolding = (index: number) => {
     const updatedHoldings = [...formData.holdings]
     updatedHoldings.splice(index, 1)
     setFormData({
@@ -62,9 +65,29 @@ export function PortfolioForm({ onSubmit }) {
     })
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    onSubmit(formData)
+    
+    const portfolioData: CreatePortfolioInput = {
+      name: formData.name,
+      description: formData.description || undefined,
+      cash: Number.parseFloat(formData.cash) || 0,
+      holdings: formData.holdings.map(holding => ({
+        ticker: holding.ticker,
+        quantity: Number.parseFloat(holding.quantity) || 0
+      }))
+    }
+
+    const result = await createPortfolio(portfolioData)
+    
+    if (result.success) {
+      setShowCreateDialog(false)
+      toast("Portfolio created successfully")
+    } else {
+      setShowCreateDialog(false)
+      toast.error("Failed to create portfolio")
+      console.error("Failed to create portfolio:", result.error)
+    }
   }
 
   return (

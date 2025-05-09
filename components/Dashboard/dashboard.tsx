@@ -17,9 +17,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { MainNav } from "@/components/main-nav"
-import { MarketSummary } from "@/components/market-summary"
 import { PortfolioForm } from "@/components/portfolio-form"
+import { DashboardNav } from "./dashboard-nav"
 
 export const DashboardPage = () => {
   const [portfolios, setPortfolios] = useState([
@@ -55,32 +54,7 @@ export const DashboardPage = () => {
   const [shareLink, setShareLink] = useState("")
   const [selectedPortfolio, setSelectedPortfolio] = useState(portfolios[0])
   const [viewMode, setViewMode] = useState("grid")
-
-  const handleCreatePortfolio = async (data) => {
-    // In a real app, this would call the server action
-    // const result = await createPortfolio(data)
-
-    // For demo purposes, we'll just add it to the state
-    const newPortfolio = {
-      id: `${portfolios.length + 1}`,
-      name: data.name,
-      description: data.description,
-      holdings: data.holdings,
-      cash: Number.parseFloat(data.cash),
-      totalValue: data.holdings.reduce((sum, h) => sum + h.value, 0) + Number.parseFloat(data.cash),
-      createdAt: new Date().toISOString(),
-    }
-
-    setPortfolios([...portfolios, newPortfolio])
-    return { success: true, id: newPortfolio.id }
-  }
-
-  const handleShare = (portfolioId) => {
-    // Generate a shareable link
-    const shareableLink = `${window.location.origin}/portfolio/${portfolioId}?share=true`
-    setShareLink(shareableLink)
-    setShowShareDialog(true)
-  }
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(shareLink)
@@ -88,34 +62,15 @@ export const DashboardPage = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <MainNav />
+      <DashboardNav />
 
       <div className="container py-6">
-        <div className="mb-8">
-          <Tabs defaultValue="dashboard">
-            <TabsList className="w-full max-w-md grid grid-cols-4 h-9 p-1 bg-zinc-900">
-              <TabsTrigger value="dashboard" className="rounded-sm">
-                Dashboard
-              </TabsTrigger>
-              <TabsTrigger value="market" className="rounded-sm">
-                Market
-              </TabsTrigger>
-              <TabsTrigger value="notes" className="rounded-sm">
-                Notes
-              </TabsTrigger>
-              <TabsTrigger value="news" className="rounded-sm">
-                News
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
 
-        <MarketSummary />
 
         <div className="mt-8 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-3xl font-bold">Portfolio</h2>
-            <Dialog>
+            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
               <DialogTrigger asChild>
                 <Button className="bg-purple-600 hover:bg-purple-700">
                   <PlusCircle className="mr-2 h-4 w-4" />
@@ -127,7 +82,7 @@ export const DashboardPage = () => {
                   <DialogTitle>Create New Portfolio</DialogTitle>
                   <DialogDescription>Add your portfolio details and holdings below.</DialogDescription>
                 </DialogHeader>
-                <PortfolioForm onSubmit={handleCreatePortfolio} />
+                <PortfolioForm setShowCreateDialog={setShowCreateDialog}/>
               </DialogContent>
             </Dialog>
           </div>

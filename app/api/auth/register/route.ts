@@ -45,6 +45,7 @@ export async function POST(req: Request) {
         email,
         password: hashedPassword,
         name,
+        image:`https://robohash.org/${name}`
       },
 
       select: {

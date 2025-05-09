@@ -14,11 +14,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useSession } from "next-auth/react";
 export const RegisterForm = () => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const { data: session } = useSession();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -26,11 +24,6 @@ export const RegisterForm = () => {
     confirmPassword: "",
     terms: false,
   });
-
-  if (session) {
-    router.push("/dashboard");
-  }
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value, type, checked } = e.target;
     setFormData((prev) => ({

@@ -1,7 +1,7 @@
 "use client"
 import Link from "next/link"
 import { useState } from "react"
-import { signIn, useSession } from "next-auth/react"
+import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
@@ -13,10 +13,6 @@ export const LoginForm = () => {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState("")
-    const { data: session } = useSession()
-    if (session) {
-        router.push("/dashboard")
-    }
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         setIsLoading(true)

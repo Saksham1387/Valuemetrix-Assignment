@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { MainNav } from "@/components/main-nav"
+import { MainNav } from "@/components/Dashboard/dashboard-nav"
 import { PortfolioBreakdown } from "@/components/portfolio-breakdown"
 import { SectorAnalysis } from "@/components/sector-analysis"
 import { RiskAnalysis } from "@/components/risk-analysis"
