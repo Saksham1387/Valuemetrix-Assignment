@@ -1,0 +1,94 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String                  @id @default(auto()) @map("_id") @db.ObjectId
+  email          String                  @unique
+  name           String?
+  password       String?
+  portfolios     Portfolio[]
+  accessedShares SharedPortfolioAccess[] @relation("viewer")
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+}
+
+model Portfolio {
+  id           String                  @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  description  String?
+  visibility   PortfolioVisibility     @default(PRIVATE) // "private", "public", "smart_shared"
+  userId       String                  @db.ObjectId
+  user         User                    @relation(fields: [userId], references: [id])
+  holdings     Holding[]
+  cash         Float                   @default(0)
+  sharedAccess SharedPortfolioAccess[]
+  aiInsights   AIInsight[]
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+}
+
+enum PortfolioVisibility {
+  PRIVATE
+  PUBLIC
+  SMART_SHARED
+}
+
+model Holding {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  ticker      String
+  quantity    Float
+  portfolioId String    @db.ObjectId
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model SharedPortfolioAccess {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  token       String           @unique // Will be filled with UUID or nanoid
+  portfolioId String           @db.ObjectId
+  portfolio   Portfolio        @relation(fields: [portfolioId], references: [id])
+  viewerId    String?          @db.ObjectId // Optional: linked if viewer logs in
+  viewer      User?            @relation("viewer", fields: [viewerId], references: [id])
+  fingerprint String?
+  isActive    Boolean          @default(true) // Can be used to revoke access
+  expiresAt   DateTime?
+  viewCount   Int              @default(0) // Track number of views
+  accessLogs  TokenAccessLog[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model TokenAccessLog {
+  id        String                @id @default(auto()) @map("_id") @db.ObjectId
+  accessId  String                @db.ObjectId
+  access    SharedPortfolioAccess @relation(fields: [accessId], references: [id])
+  ip        String?
+  userAgent String?
+  viewedAt  DateTime              @default(now())
+}
+
+model AIInsight {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  portfolioId      String    @db.ObjectId
+  portfolio        Portfolio @relation(fields: [portfolioId], references: [id])
+  summary          String
+  diversification  String
+  sectorExposure   String
+  investmentThesis String
+  fullAnalysis     String?
+  generatedAt      DateTime  @default(now())
+}
