@@ -7,11 +7,11 @@ export const SummaryCards = ({
   selectedPortfolio: Portfolio;
 }) => {
   const calculateTotalValue = (portfolio: Portfolio) => {
-    const holdingsValue = portfolio.holdings.reduce((sum, holding) => {
+    const holdingsValue = portfolio?.holdings.reduce((sum, holding) => {
       const price = 100;
       return sum + holding.quantity * price;
     }, 0);
-    return holdingsValue + portfolio.cash;
+    return holdingsValue + portfolio?.cash;
   };
 
   return (

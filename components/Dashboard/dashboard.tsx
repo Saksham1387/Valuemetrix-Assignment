@@ -48,18 +48,14 @@ export const DashboardPage = ({ initialPortfolios }: DashboardPageProps) => {
   const [portfolios, setPortfolios] = useState(initialPortfolios);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareLink, setShareLink] = useState("");
-  const [selectedPortfolio, setSelectedPortfolio] = useState(
-    initialPortfolios[0] || null
+  const [selectedPortfolio, setSelectedPortfolio] = useState<Portfolio | null>(
+    initialPortfolios.length > 0 ? initialPortfolios[0] : null
   );
   const [stockPrices, setStockPrices] = useState<Record<string, any>>({});
   const router = useRouter();
   const [viewMode, setViewMode] = useState("grid");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  if (!selectedPortfolio && portfolios.length > 0) {
-    setSelectedPortfolio(portfolios[0]);
-  }
 
   const emptyPortfolio: Portfolio = {
     id: "",
@@ -187,109 +183,180 @@ export const DashboardPage = ({ initialPortfolios }: DashboardPageProps) => {
             </Dialog>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+          {portfolios.length === 0 ? (
+            <Card className="border-zinc-800 bg-zinc-900">
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="rounded-full bg-zinc-800 p-4 mb-4">
+                  <PlusCircle className="h-8 w-8 text-zinc-400" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">No Portfolios Yet</h3>
+                <p className="text-zinc-400 mb-6 max-w-md">
+                  Create your first portfolio to start tracking your investments and monitor your performance.
+                </p>
+                <Button 
+                  className="bg-purple-600 hover:bg-purple-700"
+                  onClick={() => setShowCreateDialog(true)}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Create Your First Portfolio
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-[240px] justify-between"
+                      >
+                        {selectedPortfolio?.name || "Select a Portfolio"}
+                        <ChevronDown className="h-4 w-4 opacity-50" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-[240px]">
+                      {portfolios.map((portfolio) => (
+                        <DropdownMenuItem
+                          key={portfolio.id}
+                          onClick={() => {
+                            setSelectedPortfolio(portfolio);
+                          }}
+                        >
+                          {portfolio.name}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
                   <Button
                     variant="outline"
-                    className="w-[240px] justify-between"
+                    size="icon"
+                    onClick={() => {
+                      router.push(`/portfolio/${selectedPortfolio?.id}`);
+                    }}
                   >
-                    {selectedPortfolio?.name || "Select a Portfolio"}
-                    <ChevronDown className="h-4 w-4 opacity-50" />
+                    <ArrowUpRight className="h-4 w-4" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-[240px]">
-                  {portfolios.map((portfolio) => (
-                    <DropdownMenuItem
-                      key={portfolio.id}
-                      onClick={() => {
-                        setSelectedPortfolio(portfolio);
-                      }}
-                    >
-                      {portfolio.name}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </div>
 
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  router.push(`/portfolio/${selectedPortfolio?.id}`);
-                }}
-              >
-                <ArrowUpRight className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-              >
-                <RefreshCw
-                  className={`mr-2 h-4 w-4 ${
-                    isRefreshing ? "animate-spin" : ""
-                  }`}
-                />
-                Refresh
-              </Button>
-            </div>
-          </div>
-
-          <SummaryCards selectedPortfolio={selectedPortfolio} />
-
-          <div className="flex items-center justify-between mt-8">
-            <div className="flex items-center gap-2">
-              <h3 className="text-xl font-bold">
-                {selectedPortfolio?.holdings.length || 0} Positions
-              </h3>
-             
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="flex border rounded-md overflow-hidden">
-                <Button
-                  variant={viewMode === "grid" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="rounded-none"
-                  onClick={() => setViewMode("grid")}
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={viewMode === "list" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="rounded-none"
-                  onClick={() => setViewMode("list")}
-                >
-                  <List className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                  >
+                    <RefreshCw
+                      className={`mr-2 h-4 w-4 ${
+                        isRefreshing ? "animate-spin" : ""
+                      }`}
+                    />
+                    Refresh
+                  </Button>
+                </div>
               </div>
-            </div>
-          </div>
 
-          {viewMode === "grid" ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {selectedPortfolio?.holdings.map((holding) => {
-                const stockData = stockPrices[holding.ticker];
-                const value = holding.quantity * (stockData?.price || 0);
-                const priceChangeColor = stockData ? (stockData.changePercent >= 0 ? "text-green-500" : "text-red-500") : "";
+              <SummaryCards selectedPortfolio={selectedPortfolio || emptyPortfolio} />
 
-                return (
-                  <Card key={holding.id} className="border-zinc-800 bg-zinc-900">
+              <div className="flex items-center justify-between mt-8">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-bold">
+                    {selectedPortfolio?.holdings?.length || 0} Positions
+                  </h3>
+                 
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex border rounded-md overflow-hidden">
+                    <Button
+                      variant={viewMode === "grid" ? "secondary" : "ghost"}
+                      size="icon"
+                      className="rounded-none"
+                      onClick={() => setViewMode("grid")}
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={viewMode === "list" ? "secondary" : "ghost"}
+                      size="icon"
+                      className="rounded-none"
+                      onClick={() => setViewMode("list")}
+                    >
+                      <List className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {viewMode === "grid" ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {selectedPortfolio?.holdings.map((holding) => {
+                    const stockData = stockPrices[holding.ticker];
+                    const value = holding.quantity * (stockData?.price || 0);
+                    const priceChangeColor = stockData ? (stockData.changePercent >= 0 ? "text-green-500" : "text-red-500") : "";
+
+                    return (
+                      <Card key={holding.id} className="border-zinc-800 bg-zinc-900">
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <CardTitle>{holding.ticker}</CardTitle>
+                              <CardDescription>{stockData?.companyName || holding.ticker}</CardDescription>
+                            </div>
+                            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-zinc-800">
+                              {holding.ticker.charAt(0)}
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-sm text-muted-foreground">
+                                Quantity:
+                              </span>
+                              <span className="font-medium">{holding.quantity}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-muted-foreground">
+                                Price:
+                              </span>
+                              <span className="font-medium">
+                                ${stockData?.price?.toLocaleString() || "N/A"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-muted-foreground">
+                                Value:
+                              </span>
+                              <span className="font-medium">
+                                ${value.toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-muted-foreground">
+                                Day Change:
+                              </span>
+                              <span className={`font-medium ${priceChangeColor}`}>
+                                {stockData ? `${stockData.changePercent >= 0 ? "+" : ""}${stockData.changePercent.toFixed(2)}%` : "N/A"}
+                              </span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+
+                  <Card className="border-zinc-800 bg-zinc-900">
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
                         <div>
-                          <CardTitle>{holding.ticker}</CardTitle>
-                          <CardDescription>{stockData?.companyName || holding.ticker}</CardDescription>
+                          <CardTitle>Cash</CardTitle>
+                          <CardDescription>USD</CardDescription>
                         </div>
                         <div className="flex items-center justify-center w-10 h-10 rounded-full bg-zinc-800">
-                          {holding.ticker.charAt(0)}
+                          $
                         </div>
                       </div>
                     </CardHeader>
@@ -297,140 +364,92 @@ export const DashboardPage = ({ initialPortfolios }: DashboardPageProps) => {
                       <div className="space-y-2">
                         <div className="flex justify-between">
                           <span className="text-sm text-muted-foreground">
-                            Quantity:
-                          </span>
-                          <span className="font-medium">{holding.quantity}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">
-                            Price:
-                          </span>
-                          <span className="font-medium">
-                            ${stockData?.price?.toLocaleString() || "N/A"}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">
                             Value:
                           </span>
                           <span className="font-medium">
-                            ${value.toLocaleString()}
+                            ${selectedPortfolio?.cash.toLocaleString() || 0}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm text-muted-foreground">
-                            Day Change:
+                            Allocation:
                           </span>
-                          <span className={`font-medium ${priceChangeColor}`}>
-                            {stockData ? `${stockData.changePercent >= 0 ? "+" : ""}${stockData.changePercent.toFixed(2)}%` : "N/A"}
+                          <span className="font-medium">
+                            {(
+                              ((selectedPortfolio?.cash || 0) /
+                                calculateTotalValue(
+                                  selectedPortfolio || emptyPortfolio
+                                )) *
+                              100
+                            ).toFixed(1)}
+                            %
                           </span>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
-                );
-              })}
-
-              <Card className="border-zinc-800 bg-zinc-900">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Cash</CardTitle>
-                      <CardDescription>USD</CardDescription>
-                    </div>
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-zinc-800">
-                      $
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Value:
-                      </span>
-                      <span className="font-medium">
-                        ${selectedPortfolio?.cash.toLocaleString() || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Allocation:
-                      </span>
-                      <span className="font-medium">
-                        {(
-                          ((selectedPortfolio?.cash || 0) /
-                            calculateTotalValue(
-                              selectedPortfolio || emptyPortfolio
-                            )) *
-                          100
-                        ).toFixed(1)}
-                        %
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <Card className="border-zinc-800 bg-zinc-900">
-              <CardContent className="p-0">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-zinc-800">
-                      <th className="text-left p-4">#</th>
-                      <th className="text-left p-4">Ticker</th>
-                      <th className="text-left p-4">Name</th>
-                      <th className="text-right p-4">Quantity</th>
-                      <th className="text-right p-4">Price</th>
-                      <th className="text-right p-4">Value</th>
-                      <th className="text-right p-4">Day Change</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedPortfolio?.holdings.map((holding, index) => {
-                      const stockData = stockPrices[holding.ticker];
-                      const value = holding.quantity * (stockData?.price || 0);
-                      const priceChangeColor = stockData ? (stockData.changePercent >= 0 ? "text-green-500" : "text-red-500") : "";
-
-                      return (
-                        <tr
-                          key={holding.id}
-                          className="border-b border-zinc-800 hover:bg-zinc-800/50"
-                        >
-                          <td className="p-4">{index + 1}</td>
-                          <td className="p-4 font-medium">{holding.ticker}</td>
-                          <td className="p-4">{stockData?.companyName || holding.ticker}</td>
-                          <td className="p-4 text-right">{holding.quantity}</td>
-                          <td className="p-4 text-right">
-                            ${stockData?.price?.toLocaleString() || "N/A"}
-                          </td>
-                          <td className="p-4 text-right">
-                            ${value.toLocaleString()}
-                          </td>
-                          <td className={`p-4 text-right ${priceChangeColor}`}>
-                            {stockData ? `${stockData.changePercent >= 0 ? "+" : ""}${stockData.changePercent.toFixed(2)}%` : "N/A"}
-                          </td>
+                </div>
+              ) : (
+                <Card className="border-zinc-800 bg-zinc-900">
+                  <CardContent className="p-0">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-zinc-800">
+                          <th className="text-left p-4">#</th>
+                          <th className="text-left p-4">Ticker</th>
+                          <th className="text-left p-4">Name</th>
+                          <th className="text-right p-4">Quantity</th>
+                          <th className="text-right p-4">Price</th>
+                          <th className="text-right p-4">Value</th>
+                          <th className="text-right p-4">Day Change</th>
                         </tr>
-                      );
-                    })}
-                    <tr className="hover:bg-zinc-800/50">
-                      <td className="p-4">
-                        {selectedPortfolio?.holdings.length + 1 || 0}
-                      </td>
-                      <td className="p-4 font-medium">CASH</td>
-                      <td className="p-4">USD</td>
-                      <td className="p-4 text-right">-</td>
-                      <td className="p-4 text-right">-</td>
-                      <td className="p-4 text-right">
-                        ${selectedPortfolio?.cash.toLocaleString() || 0}
-                      </td>
-                      <td className="p-4 text-right">-</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
+                      </thead>
+                      <tbody>
+                        {selectedPortfolio?.holdings.map((holding, index) => {
+                          const stockData = stockPrices[holding.ticker];
+                          const value = holding.quantity * (stockData?.price || 0);
+                          const priceChangeColor = stockData ? (stockData.changePercent >= 0 ? "text-green-500" : "text-red-500") : "";
+
+                          return (
+                            <tr
+                              key={holding.id}
+                              className="border-b border-zinc-800 hover:bg-zinc-800/50"
+                            >
+                              <td className="p-4">{index + 1}</td>
+                              <td className="p-4 font-medium">{holding.ticker}</td>
+                              <td className="p-4">{stockData?.companyName || holding.ticker}</td>
+                              <td className="p-4 text-right">{holding.quantity}</td>
+                              <td className="p-4 text-right">
+                                ${stockData?.price?.toLocaleString() || "N/A"}
+                              </td>
+                              <td className="p-4 text-right">
+                                ${value.toLocaleString()}
+                              </td>
+                              <td className={`p-4 text-right ${priceChangeColor}`}>
+                                {stockData ? `${stockData.changePercent >= 0 ? "+" : ""}${stockData.changePercent.toFixed(2)}%` : "N/A"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        <tr className="hover:bg-zinc-800/50">
+                          <td className="p-4">
+                            {selectedPortfolio?.holdings?.length  ? selectedPortfolio?.holdings?.length + 1 : 0}
+                          </td>
+                          <td className="p-4 font-medium">CASH</td>
+                          <td className="p-4">USD</td>
+                          <td className="p-4 text-right">-</td>
+                          <td className="p-4 text-right">-</td>
+                          <td className="p-4 text-right">
+                            ${selectedPortfolio?.cash.toLocaleString() || 0}
+                          </td>
+                          <td className="p-4 text-right">-</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
         </div>
       </div>
