@@ -1,8 +1,14 @@
 "use client";
 import Link from "next/link";
 import { Button } from "../ui/button";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 
 export const LandingHeader = () => {
   const { data: session } = useSession();
@@ -18,13 +24,22 @@ export const LandingHeader = () => {
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-2">
             {session ? (
-              <Avatar className="h-8 w-8">
-                <AvatarImage
-                  src={session?.user?.image || "/placeholder.svg"}
-                  alt="@user"
-                />
-                <AvatarFallback>U</AvatarFallback>
-              </Avatar>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Avatar className="h-8 w-8 cursor-pointer">
+                    <AvatarImage
+                      src={session?.user?.image || "/placeholder.svg"}
+                      alt="@user"
+                    />
+                    <AvatarFallback>U</AvatarFallback>
+                  </Avatar>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => signOut()}>
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <div>
                 <Link href="/auth/login">

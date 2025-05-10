@@ -1,18 +1,15 @@
 "use client";
 import Link from "next/link";
-import {
-  Home,
-  MessageSquare,
-  LineChart,
-  BarChart3,
-  Newspaper,
-  FileText,
-  Search,
-  Plus,
-} from "lucide-react";
+import { LineChart, LogOut } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function DashboardNav() {
   const { data: session } = useSession();
@@ -24,45 +21,34 @@ export function DashboardNav() {
             <LineChart className="h-5 w-5" />
           </Link>
         </div>
-
-        <div className="flex space-x-1">
-          {/* <Button variant="ghost" size="sm" className="h-9" asChild>
-            <Link href="/dashboard">
-              <Home className="mr-2 h-4 w-4" />
-              Dashboard
-            </Link>
-          </Button> */}
-
-          {/* <Button variant="ghost" size="sm" className="h-9" asChild>
-            <Link href="/chat">
-              <MessageSquare className="mr-2 h-4 w-4" />
-              Chat with Voyager
-            </Link>
-          </Button> */}
-
-          {/* <Button variant="ghost" size="sm" className="h-9" asChild>
-            <Link href="/portfolio">
-              <LineChart className="mr-2 h-4 w-4" />
-              Portfolio
-            </Link>
-          </Button> */}
-
-          {/* <Button variant="ghost" size="sm" className="h-9" asChild>
-            <Link href="/explore">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Explore Portfolios
-            </Link>
-          </Button> */}
-        </div>
-
+        <div className="flex space-x-1"></div>
         <div className="ml-auto flex items-center space-x-2">
-          <Avatar className="h-8 w-8">
-            <AvatarImage
-              src={session?.user?.image || "/placeholder.svg"}
-              alt="@user"
-            />
-            <AvatarFallback>U</AvatarFallback>
-          </Avatar>
+          {session ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Avatar className="h-8 w-8 cursor-pointer">
+                  <AvatarImage
+                    src={session.user?.image || "/placeholder.svg"}
+                    alt="@user"
+                  />
+                  <AvatarFallback>U</AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => signOut()}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button asChild>
+              <Link href="/api/auth/signin">Login</Link>
+            </Button>
+          )}
         </div>
       </div>
     </header>
