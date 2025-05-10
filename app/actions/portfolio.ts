@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth/auth";
 import { PortfolioVisibility } from "@/generated/prisma/client";
-import { nanoid } from 'nanoid';
 
 export type CreatePortfolioInput = {
   name: string;
@@ -20,6 +19,16 @@ export type UpdatePortfolioVisibilityInput = {
   id: string;
   visibility: PortfolioVisibility;
 };
+
+export type GenerateShareTokenInput = {
+  portfolioId: string;
+  expiresAt?: Date;
+};
+
+export type RevokeShareTokenInput = {
+  token: string;
+};
+
 
 export async function updatePortfolioVisibility(data: UpdatePortfolioVisibilityInput) {
   const session = await getServerSession(authOptions as AuthOptions);
@@ -119,14 +128,6 @@ export async function createPortfolio(data: CreatePortfolioInput) {
   }
 }
 
-export type GenerateShareTokenInput = {
-  portfolioId: string;
-  expiresAt?: Date;
-};
-
-export type RevokeShareTokenInput = {
-  token: string;
-};
 
 export async function generateShareToken(data: GenerateShareTokenInput) {
   const session = await getServerSession(authOptions as AuthOptions);
@@ -152,8 +153,6 @@ export async function generateShareToken(data: GenerateShareTokenInput) {
     throw new Error("Unauthorized");
   }
 
-  // Generate a secure random token that's compatible with MongoDB ObjectId
-  // Using a 24-character hex string (12 bytes)
   const token = Array.from({ length: 24 }, () => 
     Math.floor(Math.random() * 16).toString(16)
   ).join('');
@@ -180,7 +179,7 @@ export async function getPortfolioByShareToken(token: string) {
       },
     },
   });
-  console.log(sharedAccess)
+
   if (!sharedAccess) {
     throw new Error("Share link not found");
   }
@@ -193,14 +192,12 @@ export async function getPortfolioByShareToken(token: string) {
     throw new Error("Share link has expired");
   }
 
-  // Log the access
   await prisma.tokenAccessLog.create({
     data: {
       accessId: sharedAccess.id,
     },
   });
 
-  // Increment view count
   await prisma.sharedPortfolioAccess.update({
     where: { id: sharedAccess.id },
     data: { viewCount: { increment: 1 } },

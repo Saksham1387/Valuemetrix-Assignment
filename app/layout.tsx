@@ -10,9 +10,6 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Portfolio Share",
-  description:
-    "Create and share your investment portfolio with AI-powered insights",
-  generator: "v0.dev",
 };
 
 export default function RootLayout({
