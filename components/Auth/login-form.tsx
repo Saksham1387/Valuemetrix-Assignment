@@ -93,7 +93,7 @@ export const LoginForm = () => {
                     </Button>
                     <div className="text-center text-sm">
                         Don&apos;t have an account?{" "}
-                        <Link href="/register" className="text-primary underline-offset-4 hover:underline">
+                        <Link href="/auth/register" className="text-primary underline-offset-4 hover:underline">
                             Sign up
                         </Link>
                     </div>

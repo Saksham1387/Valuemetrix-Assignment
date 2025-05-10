@@ -163,7 +163,7 @@ export const RegisterForm = () => {
             <div className="text-center text-sm">
               Already have an account?{" "}
               <Link
-                href="/login"
+                href="/auth/login"
                 className="text-primary underline-offset-4 hover:underline"
               >
                 Login
