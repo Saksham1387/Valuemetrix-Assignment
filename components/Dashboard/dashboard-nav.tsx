@@ -56,17 +56,11 @@ export function DashboardNav() {
         </div>
 
         <div className="ml-auto flex items-center space-x-2">
-          <div className="relative w-60">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search..."
-              className="w-full rounded-md bg-secondary pl-8 md:w-[200px] lg:w-[240px]"
-            />
-          </div>
-
           <Avatar className="h-8 w-8">
-            <AvatarImage src={session?.user?.image || "/placeholder.svg"} alt="@user" />
+            <AvatarImage
+              src={session?.user?.image || "/placeholder.svg"}
+              alt="@user"
+            />
             <AvatarFallback>U</AvatarFallback>
           </Avatar>
         </div>

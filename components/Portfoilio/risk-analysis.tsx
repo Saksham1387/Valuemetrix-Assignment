@@ -4,8 +4,13 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { TransformedPortfolio } from "@/app/portfolio/[id]/page"
 
-export function RiskAnalysis({ portfolio }) {
+interface RiskAnalysisProps {
+  portfolio: TransformedPortfolio;
+}
+
+export function RiskAnalysis({ portfolio }: RiskAnalysisProps) {
   const riskMetrics = [
     {
       name: "Volatility",

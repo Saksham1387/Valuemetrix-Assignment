@@ -1,12 +1,16 @@
-"use client"
-
-import { useEffect, useState } from "react"
-import Link from "next/link"
-import { useParams } from "next/navigation"
-import { ArrowLeft, Download, Share2, RefreshCw } from "lucide-react"
-
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+"use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import {
+  ArrowLeft,
+  Share2,
+  RefreshCw,
+  Globe,
+  Lock,
+  Link as LinkIcon,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -14,285 +18,325 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { MainNav } from "@/components/Dashboard/dashboard-nav"
-import { PortfolioBreakdown } from "@/components/portfolio-breakdown"
-import { SectorAnalysis } from "@/components/sector-analysis"
-import { RiskAnalysis } from "@/components/risk-analysis"
-import { AIInsights } from "@/components/ai-insights"
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { RiskAnalysis } from "@/components/Portfoilio/risk-analysis";
+import { AIInsights } from "@/components/ai-insights";
+import { PortfolioBreakdown } from "@/components/Portfoilio/portfolio-breakdown";
+import { DashboardNav } from "@/components/Dashboard/dashboard-nav";
+import {
+  getPortfolio,
+  updatePortfolioVisibility,
+  generateShareToken,
+  revokeShareToken,
+  getPortfolioShares,
+} from "@/app/actions/portfolio";
+import type { Portfolio as PortfolioType } from "@/lib/types/portfolio";
+import { toast } from "sonner";
+import { transformPortfolio } from "@/lib/helper";
+import { ActiveShareCard } from "@/components/Portfoilio/active-share-card";
+import { PortfolioSummaryCard } from "@/components/Portfoilio/portfolio-summary-card";
+
+export interface Holding {
+  id: string;
+  ticker: string;
+  quantity: number;
+  portfolioId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Portfolio extends PortfolioType {
+  holdings: Holding[];
+}
+
+export interface TransformedPortfolio extends Portfolio {
+  totalValue: number;
+  sectors: Array<{
+    name: string;
+    value: number;
+    percentage: number;
+  }>;
+  risk: {
+    score: number;
+    volatility: string;
+    sharpeRatio: number;
+    beta: number;
+    drawdown: number;
+  };
+  stockPrices: Record<
+    string,
+    {
+      price: number;
+      change: number;
+      changePercent: number;
+      timestamp: string;
+      high: number;
+      low: number;
+      open: number;
+      previousClose: number;
+      companyName: string;
+      sector: string;
+      currency: string;
+    }
+  >;
+}
 
 export default function PortfolioPage() {
-  const params = useParams()
-  const portfolioId = params.id
+  const params = useParams();
+  const portfolioId = params.id as string;
 
-  const [portfolio, setPortfolio] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [showShareDialog, setShowShareDialog] = useState(false)
-  const [shareLink, setShareLink] = useState("")
-  const [viewMode, setViewMode] = useState("grid")
+  const [portfolio, setPortfolio] = useState<TransformedPortfolio | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareLink, setShareLink] = useState("");
+  const [updatingVisibility, setUpdatingVisibility] = useState(false);
+  const [generatingShareLink, setGeneratingShareLink] = useState(false);
+  const [activeShares, setActiveShares] = useState<
+    Array<{
+      id: string;
+      token: string;
+      viewCount: number;
+      createdAt: Date;
+    }>
+  >([]);
+  const [revokingShare, setRevokingShare] = useState<string | null>(null);
+  const [refreshingPrices, setRefreshingPrices] = useState(false);
+
+  const fetchStockPrices = async (symbols: string[]) => {
+    try {
+      const response = await fetch("/api/stocks", {
+        method: "POST",
+        body: JSON.stringify({ symbols }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch stock prices");
+      }
+
+      const data = await response.json();
+      const prices: Record<string, any> = {};
+
+      data.quotes.forEach((quote: any) => {
+        if (!quote.error) {
+          prices[quote.symbol] = {
+            price: quote.price,
+            change: quote.change,
+            changePercent: quote.changePercent,
+            timestamp: quote.timestamp,
+            high: quote.high,
+            low: quote.low,
+            open: quote.open,
+            previousClose: quote.previousClose,
+            companyName: quote.companyName || quote.symbol,
+            sector: quote.sector || "Unknown",
+            currency: quote.currency || "USD",
+          };
+        }
+      });
+
+      return prices;
+    } catch (error) {
+      console.error("Error fetching stock prices:", error);
+      return {};
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (!portfolio) return;
+
+    setRefreshingPrices(true);
+    try {
+      const symbols = [...new Set(portfolio.holdings.map((h) => h.ticker))];
+      const stockPrices = await fetchStockPrices(symbols);
+      const updatedPortfolio = transformPortfolio(portfolio, stockPrices);
+      setPortfolio(updatedPortfolio);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to refresh prices");
+    } finally {
+      setRefreshingPrices(false);
+    }
+  };
 
   useEffect(() => {
-    // In a real app, this would fetch from an API
-    // For demo purposes, we'll simulate a portfolio
-    setTimeout(() => {
-      if (portfolioId === "1") {
-        setPortfolio({
-          id: "1",
-          name: "Tech Growth Portfolio",
-          description: "High-growth technology stocks",
-          holdings: [
-            {
-              ticker: "AAPL",
-              name: "Apple Inc.",
-              quantity: 10,
-              price: 175.05,
-              value: 1750.5,
-              weight: 17.0,
-              sector: "Technology",
-            },
-            {
-              ticker: "MSFT",
-              name: "Microsoft Corp.",
-              quantity: 5,
-              price: 370.05,
-              value: 1850.25,
-              weight: 18.0,
-              sector: "Technology",
-            },
-            {
-              ticker: "GOOGL",
-              name: "Alphabet Inc.",
-              quantity: 3,
-              price: 1400.25,
-              value: 4200.75,
-              weight: 40.8,
-              sector: "Technology",
-            },
-            {
-              ticker: "AMZN",
-              name: "Amazon.com Inc.",
-              quantity: 2,
-              price: 175.05,
-              value: 350.1,
-              weight: 3.4,
-              sector: "Consumer Cyclical",
-            },
-            {
-              ticker: "NVDA",
-              name: "NVIDIA Corp.",
-              quantity: 4,
-              price: 412.5,
-              value: 1650.0,
-              weight: 16.0,
-              sector: "Technology",
-            },
-          ],
-          cash: 2500,
-          totalValue: 10301.5,
-          createdAt: "2023-05-15T10:30:00Z",
-          sectors: [
-            { name: "Technology", value: 9451.5, percentage: 91.7 },
-            { name: "Consumer Cyclical", value: 350.1, percentage: 3.4 },
-            { name: "Cash", value: 2500, percentage: 4.9 },
-          ],
-          risk: {
-            score: 78,
-            volatility: "High",
-            sharpeRatio: 1.2,
-            beta: 1.35,
-            drawdown: -15.2,
-          },
-        })
-      } else if (portfolioId === "2") {
-        setPortfolio({
-          id: "2",
-          name: "Dividend Income",
-          description: "Stable dividend-paying stocks",
-          holdings: [
-            {
-              ticker: "JNJ",
-              name: "Johnson & Johnson",
-              quantity: 8,
-              price: 170.0,
-              value: 1360.0,
-              weight: 23.6,
-              sector: "Healthcare",
-            },
-            {
-              ticker: "PG",
-              name: "Procter & Gamble",
-              quantity: 12,
-              price: 150.0,
-              value: 1800.0,
-              weight: 31.3,
-              sector: "Consumer Defensive",
-            },
-            {
-              ticker: "KO",
-              name: "Coca-Cola Company",
-              quantity: 20,
-              price: 55.0,
-              value: 1100.0,
-              weight: 19.1,
-              sector: "Consumer Defensive",
-            },
-            {
-              ticker: "VZ",
-              name: "Verizon Communications",
-              quantity: 15,
-              price: 40.0,
-              value: 600.0,
-              weight: 10.4,
-              sector: "Communication Services",
-            },
-            {
-              ticker: "XOM",
-              name: "Exxon Mobil Corp.",
-              quantity: 10,
-              price: 90.0,
-              value: 900.0,
-              weight: 15.6,
-              sector: "Energy",
-            },
-          ],
-          cash: 1500,
-          totalValue: 5760.0,
-          createdAt: "2023-06-20T14:45:00Z",
-          sectors: [
-            { name: "Healthcare", value: 1360.0, percentage: 23.6 },
-            { name: "Consumer Defensive", value: 2900.0, percentage: 50.4 },
-            { name: "Communication Services", value: 600.0, percentage: 10.4 },
-            { name: "Energy", value: 900.0, percentage: 15.6 },
-            { name: "Cash", value: 1500, percentage: 26.0 },
-          ],
-          risk: {
-            score: 32,
-            volatility: "Low",
-            sharpeRatio: 0.8,
-            beta: 0.65,
-            drawdown: -8.5,
-          },
-        })
-      } else {
-        // Default portfolio for demo
-        setPortfolio({
-          id: portfolioId,
-          name: "Sample Portfolio",
-          description: "A balanced portfolio for demonstration",
-          holdings: [
-            {
-              ticker: "SPY",
-              name: "SPDR S&P 500 ETF",
-              quantity: 10,
-              price: 450.0,
-              value: 4500.0,
-              weight: 45.0,
-              sector: "ETF",
-            },
-            {
-              ticker: "AAPL",
-              name: "Apple Inc.",
-              quantity: 5,
-              price: 175.05,
-              value: 875.25,
-              weight: 8.8,
-              sector: "Technology",
-            },
-            {
-              ticker: "JNJ",
-              name: "Johnson & Johnson",
-              quantity: 4,
-              price: 170.0,
-              value: 680.0,
-              weight: 6.8,
-              sector: "Healthcare",
-            },
-            {
-              ticker: "BRK.B",
-              name: "Berkshire Hathaway",
-              quantity: 3,
-              price: 350.0,
-              value: 1050.0,
-              weight: 10.5,
-              sector: "Financial Services",
-            },
-            {
-              ticker: "AMZN",
-              name: "Amazon.com Inc.",
-              quantity: 2,
-              price: 175.05,
-              value: 350.1,
-              weight: 3.5,
-              sector: "Consumer Cyclical",
-            },
-          ],
-          cash: 2544.65,
-          totalValue: 10000.0,
-          createdAt: "2023-07-10T09:15:00Z",
-          sectors: [
-            { name: "ETF", value: 4500.0, percentage: 45.0 },
-            { name: "Technology", value: 875.25, percentage: 8.8 },
-            { name: "Healthcare", value: 680.0, percentage: 6.8 },
-            { name: "Financial Services", value: 1050.0, percentage: 10.5 },
-            { name: "Consumer Cyclical", value: 350.1, percentage: 3.5 },
-            { name: "Cash", value: 2544.65, percentage: 25.4 },
-          ],
-          risk: {
-            score: 45,
-            volatility: "Medium",
-            sharpeRatio: 1.0,
-            beta: 0.85,
-            drawdown: -10.5,
-          },
-        })
+    const fetchPortfolio = async () => {
+      try {
+        const data = await getPortfolio(portfolioId);
+        if (!data) {
+          setError("Portfolio not found");
+          return;
+        }
+        const symbols = [...new Set(data.holdings.map((h) => h.ticker))];
+        const stockPrices = await fetchStockPrices(symbols);
+        const transformedData = transformPortfolio(data, stockPrices);
+        setPortfolio(transformedData);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch portfolio"
+        );
+      } finally {
+        setLoading(false);
       }
-      setLoading(false)
-    }, 500)
-  }, [portfolioId])
+    };
 
-  const handleShare = () => {
-    // Generate a shareable link
-    const shareableLink = `${window.location.origin}/portfolio/${portfolioId}?share=true`
-    setShareLink(shareableLink)
-    setShowShareDialog(true)
-  }
+    fetchPortfolio();
+  }, [portfolioId]);
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(shareLink)
-  }
+  const handleShare = async () => {
+    if (!portfolio) return;
+    setShowShareDialog(true);
+
+    await fetchActiveShares();
+  };
+
+  const handleGenerateNewLink = async () => {
+    if (!portfolio) return;
+
+    setGeneratingShareLink(true);
+    try {
+      const { token } = await generateShareToken({
+        portfolioId: portfolio.id,
+      });
+      const shareableLink = `${window.location.origin}/portfolio/${token}`;
+      setShareLink(shareableLink);
+
+      await fetchActiveShares();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to generate share link"
+      );
+    } finally {
+      setGeneratingShareLink(false);
+    }
+  };
+
+  const handleVisibilityChange = async (
+    visibility: "PRIVATE" | "PUBLIC" | "SMART_SHARED"
+  ) => {
+    if (!portfolio) return;
+
+    setUpdatingVisibility(true);
+    try {
+      const updatedPortfolio = await updatePortfolioVisibility({
+        id: portfolio.id,
+        visibility,
+      });
+
+      setPortfolio(
+        transformPortfolio(
+          {
+            ...portfolio,
+            visibility: updatedPortfolio.visibility,
+          },
+          {}
+        )
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to update visibility"
+      );
+    } finally {
+      setUpdatingVisibility(false);
+    }
+  };
+
+  const getVisibilityIcon = (visibility: string) => {
+    switch (visibility) {
+      case "PRIVATE":
+        return <Lock className="h-4 w-4" />;
+      case "PUBLIC":
+        return <Globe className="h-4 w-4" />;
+      case "SMART_SHARED":
+        return <LinkIcon className="h-4 w-4" />;
+      default:
+        return <Lock className="h-4 w-4" />;
+    }
+  };
+
+  const getVisibilityLabel = (visibility: string) => {
+    switch (visibility) {
+      case "PRIVATE":
+        return "Private";
+      case "PUBLIC":
+        return "Public";
+      case "SMART_SHARED":
+        return "Smart Shared";
+      default:
+        return "Private";
+    }
+  };
+
+  const fetchActiveShares = async () => {
+    try {
+      const { shares } = await getPortfolioShares(portfolioId);
+      setActiveShares(shares);
+    } catch (err) {
+      console.error("Failed to fetch active shares:", err);
+    }
+  };
+
+  const handleRevokeShare = async (token: string) => {
+    if (!portfolio) return;
+
+    setRevokingShare(token);
+    try {
+      await revokeShareToken({ token });
+      setActiveShares((prev) => prev.filter((share) => share.token !== token));
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to revoke share link"
+      );
+    } finally {
+      setRevokingShare(null);
+    }
+  };
+
+  useEffect(() => {
+    if (portfolio) {
+      fetchActiveShares();
+    }
+  }, [portfolio]);
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading portfolio data...</p>
+          <p className="mt-4 text-muted-foreground">
+            Loading portfolio data...
+          </p>
         </div>
       </div>
-    )
+    );
   }
 
-  if (!portfolio) {
+  if (error || !portfolio) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
           <h2 className="text-2xl font-bold">Portfolio Not Found</h2>
           <p className="mt-2 text-muted-foreground">
-            The portfolio you're looking for doesn't exist or you don't have access.
+            {error ||
+              "The portfolio you're looking for doesn't exist or you don't have access."}
           </p>
           <Button className="mt-4 bg-purple-600 hover:bg-purple-700" asChild>
             <Link href="/dashboard">Back to Dashboard</Link>
           </Button>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <MainNav />
+      <DashboardNav />
 
       <main className="flex-1 container py-6">
         <div className="flex items-center justify-between mb-6">
@@ -308,58 +352,63 @@ export default function PortfolioPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handleShare}>
-              <Share2 className="mr-2 h-4 w-4" />
-              Share
-            </Button>
-            <Button variant="outline">
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
-            <Button variant="outline">
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" disabled={updatingVisibility}>
+                  {portfolio && getVisibilityIcon(portfolio.visibility)}
+                  <span className="ml-2">
+                    {portfolio && getVisibilityLabel(portfolio.visibility)}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => handleVisibilityChange("PRIVATE")}
+                >
+                  <Lock className="mr-2 h-4 w-4" />
+                  Private
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleVisibilityChange("PUBLIC")}
+                >
+                  <Globe className="mr-2 h-4 w-4" />
+                  Public
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleVisibilityChange("SMART_SHARED")}
+                >
+                  <LinkIcon className="mr-2 h-4 w-4" />
+                  Smart Shared
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {portfolio?.visibility === "SMART_SHARED" && (
+              <Button variant="outline" onClick={handleShare}>
+                <Share2 className="mr-2 h-4 w-4" />
+                Share
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={handleRefresh}
+              disabled={refreshingPrices}
+            >
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${
+                  refreshingPrices ? "animate-spin" : ""
+                }`}
+              />
+              {refreshingPrices ? "Refreshing..." : "Refresh"}
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card className="border-zinc-800 bg-zinc-900">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${portfolio.totalValue.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Updated just now</p>
-            </CardContent>
-          </Card>
-          <Card className="border-zinc-800 bg-zinc-900">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Holdings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{portfolio.holdings.length}</div>
-              <p className="text-xs text-muted-foreground">Across {portfolio.sectors.length - 1} sectors</p>
-            </CardContent>
-          </Card>
-          <Card className="border-zinc-800 bg-zinc-900">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Risk Score</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{portfolio.risk.score}/100</div>
-              <p className="text-xs text-muted-foreground">{portfolio.risk.volatility} volatility</p>
-            </CardContent>
-          </Card>
-        </div>
+        <PortfolioSummaryCard portfolio={portfolio} />
 
-        <Tabs defaultValue="breakdown" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-4 h-9 p-1 bg-zinc-900">
+        <Tabs defaultValue="breakdown" className="w-full p-2">
+          <TabsList className="grid w-full max-w-md grid-cols-3 h-9 bg-zinc-900">
             <TabsTrigger value="breakdown" className="rounded-sm">
               Breakdown
-            </TabsTrigger>
-            <TabsTrigger value="sectors" className="rounded-sm">
-              Sectors
             </TabsTrigger>
             <TabsTrigger value="risk" className="rounded-sm">
               Risk
@@ -369,10 +418,7 @@ export default function PortfolioPage() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="breakdown" className="mt-6">
-            <PortfolioBreakdown portfolio={portfolio} />
-          </TabsContent>
-          <TabsContent value="sectors" className="mt-6">
-            <SectorAnalysis portfolio={portfolio} />
+            {portfolio && <PortfolioBreakdown portfolio={portfolio} />}
           </TabsContent>
           <TabsContent value="risk" className="mt-6">
             <RiskAnalysis portfolio={portfolio} />
@@ -383,19 +429,43 @@ export default function PortfolioPage() {
         </Tabs>
 
         <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
-          <DialogContent>
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Share Portfolio</DialogTitle>
-              <DialogDescription>Anyone with this link can view your portfolio without logging in.</DialogDescription>
+              <DialogDescription>
+                Anyone with these links can view your portfolio without logging
+                in. Links will remain active until you revoke access.
+              </DialogDescription>
             </DialogHeader>
-            <div className="flex items-center space-x-2">
-              <Input value={shareLink} readOnly className="bg-zinc-900" />
-              <Button onClick={copyToClipboard} className="bg-purple-600 hover:bg-purple-700">
-                Copy
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                onClick={handleGenerateNewLink}
+                disabled={generatingShareLink}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                {generatingShareLink ? "Generating..." : "Generate New Link"}
               </Button>
             </div>
+            <div className="mt-4">
+              <h3 className="text-sm font-medium mb-2">Active Share Links</h3>
+              {activeShares.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No active share links. Click "Generate New Link" to create
+                  one.
+                </p>
+              ) : (
+                <ActiveShareCard
+                  activeShares={activeShares}
+                  handleRevokeShare={handleRevokeShare}
+                  revokingShare={revokingShare}
+                />
+              )}
+            </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowShareDialog(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setShowShareDialog(false)}
+              >
                 Close
               </Button>
             </DialogFooter>
@@ -403,5 +473,5 @@ export default function PortfolioPage() {
         </Dialog>
       </main>
     </div>
-  )
+  );
 }
