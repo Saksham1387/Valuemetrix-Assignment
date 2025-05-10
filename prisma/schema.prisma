@@ -31,7 +31,7 @@ model Portfolio {
   id           String                  @id @default(auto()) @map("_id") @db.ObjectId
   name         String
   description  String?
-  visibility   PortfolioVisibility     @default(PRIVATE) // "private", "public", "smart_shared"
+  visibility   PortfolioVisibility     @default(PRIVATE) 
   userId       String                  @db.ObjectId
   user         User                    @relation(fields: [userId], references: [id])
   holdings     Holding[]
@@ -60,15 +60,15 @@ model Holding {
 
 model SharedPortfolioAccess {
   id          String           @id @default(auto()) @map("_id") @db.ObjectId
-  token       String           @unique // Will be filled with UUID or nanoid
+  token       String           @unique 
   portfolioId String           @db.ObjectId
   portfolio   Portfolio        @relation(fields: [portfolioId], references: [id])
-  viewerId    String?          @db.ObjectId // Optional: linked if viewer logs in
+  viewerId    String?          @db.ObjectId 
   viewer      User?            @relation("viewer", fields: [viewerId], references: [id])
   fingerprint String? 
-  isActive    Boolean          @default(true) // Can be used to revoke access
+  isActive    Boolean          @default(true)
   expiresAt   DateTime? 
-  viewCount   Int              @default(0) // Track number of views
+  viewCount   Int              @default(0) 
   accessLogs  TokenAccessLog[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
