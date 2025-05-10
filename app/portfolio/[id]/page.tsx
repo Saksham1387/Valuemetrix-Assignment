@@ -38,7 +38,6 @@ import {
   getPortfolioShares,
 } from "@/app/actions/portfolio";
 import type { Portfolio as PortfolioType } from "@/lib/types/portfolio";
-import { toast } from "sonner";
 import { transformPortfolio } from "@/lib/helper";
 import { ActiveShareCard } from "@/components/Portfoilio/active-share-card";
 import { PortfolioSummaryCard } from "@/components/Portfoilio/portfolio-summary-card";
@@ -204,7 +203,7 @@ export default function PortfolioPage() {
       const { token } = await generateShareToken({
         portfolioId: portfolio.id,
       });
-      const shareableLink = `${window.location.origin}/portfolio/${token}`;
+      const shareableLink = `${window.location.origin}/sharePortfolio/${token}`;
       setShareLink(shareableLink);
 
       await fetchActiveShares();
@@ -406,14 +405,14 @@ export default function PortfolioPage() {
         <PortfolioSummaryCard portfolio={portfolio} />
 
         <Tabs defaultValue="breakdown" className="w-full p-2">
-          <TabsList className="grid w-full max-w-md grid-cols-3 h-9 bg-zinc-900">
-            <TabsTrigger value="breakdown" className="rounded-sm">
+          <TabsList className="grid w-full max-w-md grid-cols-3 h-9 bg-zinc-900 rounded-lg">
+            <TabsTrigger value="breakdown" className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:z-10 data-[state=active]:text-white">
               Breakdown
             </TabsTrigger>
-            <TabsTrigger value="risk" className="rounded-sm">
+            <TabsTrigger value="risk" className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:z-10 data-[state=active]:text-white">
               Risk
             </TabsTrigger>
-            <TabsTrigger value="insights" className="rounded-sm">
+            <TabsTrigger value="insights" className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:z-10 data-[state=active]:text-white">
               AI Insights
             </TabsTrigger>
           </TabsList>

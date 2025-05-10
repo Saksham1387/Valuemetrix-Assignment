@@ -23,7 +23,7 @@ export const ActiveShareCard = ({ activeShares, handleRevokeShare, revokingShare
       >
         <div className="flex-1 min-w-0 mr-4">
           <p className="text-sm truncate">
-            {`${window.location.origin}/portfolio/${share.token}`}
+            {`${window.location.origin}/sharePortfolio/${share.token}`}
           </p>
           <p className="text-xs text-muted-foreground">
             Created{" "}
@@ -37,7 +37,7 @@ export const ActiveShareCard = ({ activeShares, handleRevokeShare, revokingShare
             size="sm"
             onClick={() => {
               navigator.clipboard.writeText(
-                `${window.location.origin}/portfolio/${share.token}`
+                `${window.location.origin}/sharePortfolio/${share.token}`
               );
               toast.success("Link copied to clipboard");
             }}

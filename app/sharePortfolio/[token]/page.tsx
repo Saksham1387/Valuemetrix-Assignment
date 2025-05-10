@@ -10,6 +10,10 @@ import { AIInsights } from "@/components/ai-insights"
 import { DashboardNav } from "@/components/Dashboard/dashboard-nav"
 import { getPortfolioByShareToken } from "@/app/actions/portfolio"
 import type { Portfolio as PortfolioType } from "@/lib/types/portfolio"
+import { transformPortfolio } from "@/lib/helper"
+import { PortfolioBreakdown } from "@/components/Portfoilio/portfolio-breakdown"
+import { PortfolioSummaryCard } from "@/components/Portfoilio/portfolio-summary-card"
+import { RefreshCw } from "lucide-react"
 
 interface Holding {
   id: string
@@ -38,6 +42,22 @@ interface TransformedPortfolio extends Portfolio {
     beta: number
     drawdown: number
   }
+  stockPrices: Record<
+    string,
+    {
+      price: number
+      change: number
+      changePercent: number
+      timestamp: string
+      high: number
+      low: number
+      open: number
+      previousClose: number
+      companyName: string
+      sector: string
+      currency: string
+    }
+  >
 }
 
 export default function SharedPortfolioPage() {
@@ -47,52 +67,60 @@ export default function SharedPortfolioPage() {
   const [portfolio, setPortfolio] = useState<TransformedPortfolio | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [refreshingPrices, setRefreshingPrices] = useState(false)
 
-  const transformPortfolio = (data: Portfolio): TransformedPortfolio => {
-    // Calculate total value from holdings and cash
-    const holdingsValue = data.holdings.reduce((acc, holding) => {
-      // In a real app, you would fetch current prices from an API
-      // For now, we'll use mock prices
-      const mockPrices: Record<string, number> = {
-        AAPL: 175.05,
-        MSFT: 370.05,
-        GOOGL: 1400.25,
-        AMZN: 175.05,
-        NVDA: 412.5,
-        JNJ: 170.0,
-        PG: 150.0,
-        KO: 55.0,
-        VZ: 40.0,
-        XOM: 90.0,
-        SPY: 450.0,
-        "BRK.B": 350.0,
+  const fetchStockPrices = async (symbols: string[]) => {
+    try {
+      const response = await fetch("/api/stocks", {
+        method: "POST",
+        body: JSON.stringify({ symbols }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch stock prices")
       }
-      const price = mockPrices[holding.ticker] || 100 // Default price if not found
-      return acc + holding.quantity * price
-    }, 0)
 
-    const totalValue = holdingsValue + data.cash
+      const data = await response.json()
+      const prices: Record<string, any> = {}
 
-    // Calculate sectors (mock data for now)
-    const sectors = [
-      { name: "Technology", value: holdingsValue * 0.6, percentage: 60 },
-      { name: "Cash", value: data.cash, percentage: (data.cash / totalValue) * 100 },
-    ]
+      data.quotes.forEach((quote: any) => {
+        if (!quote.error) {
+          prices[quote.symbol] = {
+            price: quote.price,
+            change: quote.change,
+            changePercent: quote.changePercent,
+            timestamp: quote.timestamp,
+            high: quote.high,
+            low: quote.low,
+            open: quote.open,
+            previousClose: quote.previousClose,
+            companyName: quote.companyName || quote.symbol,
+            sector: quote.sector || "Unknown",
+            currency: quote.currency || "USD",
+          }
+        }
+      })
 
-    // Calculate risk metrics (mock data for now)
-    const risk = {
-      score: 45,
-      volatility: "Medium",
-      sharpeRatio: 1.0,
-      beta: 0.85,
-      drawdown: -10.5,
+      return prices
+    } catch (error) {
+      console.error("Error fetching stock prices:", error)
+      return {}
     }
+  }
 
-    return {
-      ...data,
-      totalValue,
-      sectors,
-      risk,
+  const handleRefresh = async () => {
+    if (!portfolio) return
+
+    setRefreshingPrices(true)
+    try {
+      const symbols = [...new Set(portfolio.holdings.map((h) => h.ticker))]
+      const stockPrices = await fetchStockPrices(symbols)
+      const updatedPortfolio = transformPortfolio(portfolio, stockPrices)
+      setPortfolio(updatedPortfolio)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to refresh prices")
+    } finally {
+      setRefreshingPrices(false)
     }
   }
 
@@ -104,7 +132,10 @@ export default function SharedPortfolioPage() {
           setError("Portfolio not found")
           return
         }
-        setPortfolio(transformPortfolio(data))
+        const symbols = [...new Set(data.holdings.map((h) => h.ticker))]
+        const stockPrices = await fetchStockPrices(symbols)
+        const transformedData = transformPortfolio(data, stockPrices)
+        setPortfolio(transformedData)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to fetch portfolio")
       } finally {
@@ -126,13 +157,11 @@ export default function SharedPortfolioPage() {
     )
   }
 
-  console.log(portfolio)
-  console.log(error)
   if (error || !portfolio) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
-          <h2 className="text-2xl font-bold">Portfolio Not Foufdsfdsnd</h2>
+          <h2 className="text-2xl font-bold">Portfolio Not Found</h2>
           <p className="mt-2 text-muted-foreground">
             {error || "The portfolio you're looking for doesn't exist or the share link has expired."}
           </p>
@@ -156,37 +185,23 @@ export default function SharedPortfolioPage() {
               <p className="text-muted-foreground">{portfolio.description}</p>
             </div>
           </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleRefresh}
+              disabled={refreshingPrices}
+            >
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${
+                  refreshingPrices ? "animate-spin" : ""
+                }`}
+              />
+              {refreshingPrices ? "Refreshing..." : "Refresh"}
+            </Button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card className="border-zinc-800 bg-zinc-900">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${portfolio.totalValue.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Updated just now</p>
-            </CardContent>
-          </Card>
-          <Card className="border-zinc-800 bg-zinc-900">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Holdings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{portfolio.holdings.length}</div>
-              <p className="text-xs text-muted-foreground">Across {portfolio.sectors.length - 1} sectors</p>
-            </CardContent>
-          </Card>
-          <Card className="border-zinc-800 bg-zinc-900">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Risk Score</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{portfolio.risk.score}/100</div>
-              <p className="text-xs text-muted-foreground">{portfolio.risk.volatility} volatility</p>
-            </CardContent>
-          </Card>
-        </div>
+        <PortfolioSummaryCard portfolio={portfolio} />
 
         <Tabs defaultValue="breakdown" className="w-full p-2">
           <TabsList className="grid w-full max-w-md grid-cols-3 h-9 bg-zinc-900">
@@ -201,7 +216,7 @@ export default function SharedPortfolioPage() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="breakdown" className="mt-6">
-            {/* <PortfolioBreakdown portfolio={portfolio} /> */}
+            {portfolio && <PortfolioBreakdown portfolio={portfolio} />}
           </TabsContent>
           <TabsContent value="risk" className="mt-6">
             <RiskAnalysis portfolio={portfolio} />

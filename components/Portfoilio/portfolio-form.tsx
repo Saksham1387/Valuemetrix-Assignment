@@ -16,7 +16,7 @@ export function PortfolioForm({ setShowCreateDialog }: { setShowCreateDialog: (s
     name: "",
     description: "",
     cash: "0",
-    holdings: [{ ticker: "", name: "", quantity: "", price: "", value: 0 }],
+    holdings: [{ ticker: "", name: "", quantity: "", value: 0 }],
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -34,13 +34,10 @@ export function PortfolioForm({ setShowCreateDialog }: { setShowCreateDialog: (s
       [field]: value,
     }
 
-    // Calculate value if we have both quantity and price
-    if (field === "quantity" || field === "price") {
-      const quantity =
-        field === "quantity" ? Number.parseFloat(value) || 0 : Number.parseFloat(updatedHoldings[index].quantity) || 0
-      const price =
-        field === "price" ? Number.parseFloat(value) || 0 : Number.parseFloat(updatedHoldings[index].price) || 0
-      updatedHoldings[index].value = quantity * price
+    // Calculate value based on quantity (using default price of 100)
+    if (field === "quantity") {
+      const quantity = Number.parseFloat(value) || 0
+      updatedHoldings[index].value = quantity * 100
     }
 
     setFormData({
@@ -52,7 +49,7 @@ export function PortfolioForm({ setShowCreateDialog }: { setShowCreateDialog: (s
   const addHolding = () => {
     setFormData({
       ...formData,
-      holdings: [...formData.holdings, { ticker: "", name: "", quantity: "", price: "", value: 0 }],
+      holdings: [...formData.holdings, { ticker: "", name: "", quantity: "", value: 0 }],
     })
   }
 
@@ -91,7 +88,7 @@ export function PortfolioForm({ setShowCreateDialog }: { setShowCreateDialog: (s
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="max-h-[80vh] overflow-y-auto">
       <div className="grid gap-4 py-4">
         <div className="grid gap-2">
           <Label htmlFor="name">Portfolio Name</Label>
@@ -181,26 +178,9 @@ export function PortfolioForm({ setShowCreateDialog }: { setShowCreateDialog: (s
                     required
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor={`price-${index}`}>Price Per Share ($)</Label>
-                  <Input
-                    id={`price-${index}`}
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={holding.price}
-                    onChange={(e) => handleHoldingChange(index, "price", e.target.value)}
-                    placeholder="150.00"
-                    className="bg-zinc-800 border-zinc-700"
-                    required
-                  />
-                </div>
               </div>
               <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-sm font-medium">Value: </span>
-                  <span className="text-sm">${holding.value.toFixed(2)}</span>
-                </div>
+            
                 {formData.holdings.length > 1 && (
                   <Button
                     type="button"

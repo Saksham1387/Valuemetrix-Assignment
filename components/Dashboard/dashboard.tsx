@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   PlusCircle,
   LayoutGrid,
@@ -51,6 +51,7 @@ export const DashboardPage = ({ initialPortfolios }: DashboardPageProps) => {
   const [selectedPortfolio, setSelectedPortfolio] = useState(
     initialPortfolios[0] || null
   );
+  const [stockPrices, setStockPrices] = useState<Record<string, any>>({});
   const router = useRouter();
   const [viewMode, setViewMode] = useState("grid");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -76,6 +77,56 @@ export const DashboardPage = ({ initialPortfolios }: DashboardPageProps) => {
     navigator.clipboard.writeText(shareLink);
   };
 
+  const fetchStockPrices = async (symbols: string[]) => {
+    try {
+      const response = await fetch("/api/stocks", {
+        method: "POST",
+        body: JSON.stringify({ symbols }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch stock prices");
+      }
+
+      const data = await response.json();
+      const prices: Record<string, any> = {};
+
+      data.quotes.forEach((quote: any) => {
+        if (!quote.error) {
+          prices[quote.symbol] = {
+            price: quote.price,
+            change: quote.change,
+            changePercent: quote.changePercent,
+            timestamp: quote.timestamp,
+            high: quote.high,
+            low: quote.low,
+            open: quote.open,
+            previousClose: quote.previousClose,
+            companyName: quote.companyName || quote.symbol,
+            sector: quote.sector || "Unknown",
+            currency: quote.currency || "USD",
+          };
+        }
+      });
+
+      return prices;
+    } catch (error) {
+      console.error("Error fetching stock prices:", error);
+      return {};
+    }
+  };
+
+  useEffect(() => {
+    const fetchPrices = async () => {
+      if (selectedPortfolio) {
+        const symbols = [...new Set(selectedPortfolio.holdings.map((h) => h.ticker))];
+        const prices = await fetchStockPrices(symbols);
+        setStockPrices(prices);
+      }
+    };
+    fetchPrices();
+  }, [selectedPortfolio]);
+
   const handleRefresh = async () => {
     try {
       setIsRefreshing(true);
@@ -85,6 +136,12 @@ export const DashboardPage = ({ initialPortfolios }: DashboardPageProps) => {
         (p) => p.id === selectedPortfolio?.id
       );
       setSelectedPortfolio(currentPortfolio || updatedPortfolios[0] || null);
+
+      if (currentPortfolio) {
+        const symbols = [...new Set(currentPortfolio.holdings.map((h) => h.ticker))];
+        const prices = await fetchStockPrices(symbols);
+        setStockPrices(prices);
+      }
 
       toast.success("Portfolios refreshed successfully");
     } catch (error) {
@@ -97,7 +154,7 @@ export const DashboardPage = ({ initialPortfolios }: DashboardPageProps) => {
 
   const calculateTotalValue = (portfolio: Portfolio) => {
     const holdingsValue = portfolio.holdings.reduce((sum, holding) => {
-      const price = 100;
+      const price = stockPrices[holding.ticker]?.price || 0;
       return sum + holding.quantity * price;
     }, 0);
     return holdingsValue + portfolio.cash;
@@ -191,10 +248,7 @@ export const DashboardPage = ({ initialPortfolios }: DashboardPageProps) => {
               <h3 className="text-xl font-bold">
                 {selectedPortfolio?.holdings.length || 0} Positions
               </h3>
-              <p className="text-sm text-muted-foreground">
-                Day Return:{" "}
-                <span className="text-positive">+$145.20 (1.4%)</span>
-              </p>
+             
             </div>
 
             <div className="flex items-center gap-2">
@@ -221,45 +275,61 @@ export const DashboardPage = ({ initialPortfolios }: DashboardPageProps) => {
 
           {viewMode === "grid" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {selectedPortfolio?.holdings.map((holding) => (
-                <Card key={holding.id} className="border-zinc-800 bg-zinc-900">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle>{holding.ticker}</CardTitle>
-                        <CardDescription>{holding.ticker}</CardDescription>
+              {selectedPortfolio?.holdings.map((holding) => {
+                const stockData = stockPrices[holding.ticker];
+                const value = holding.quantity * (stockData?.price || 0);
+                const priceChangeColor = stockData ? (stockData.changePercent >= 0 ? "text-green-500" : "text-red-500") : "";
+
+                return (
+                  <Card key={holding.id} className="border-zinc-800 bg-zinc-900">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle>{holding.ticker}</CardTitle>
+                          <CardDescription>{stockData?.companyName || holding.ticker}</CardDescription>
+                        </div>
+                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-zinc-800">
+                          {holding.ticker.charAt(0)}
+                        </div>
                       </div>
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-zinc-800">
-                        {holding.ticker.charAt(0)}
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">
+                            Quantity:
+                          </span>
+                          <span className="font-medium">{holding.quantity}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">
+                            Price:
+                          </span>
+                          <span className="font-medium">
+                            ${stockData?.price?.toLocaleString() || "N/A"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">
+                            Value:
+                          </span>
+                          <span className="font-medium">
+                            ${value.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">
+                            Day Change:
+                          </span>
+                          <span className={`font-medium ${priceChangeColor}`}>
+                            {stockData ? `${stockData.changePercent >= 0 ? "+" : ""}${stockData.changePercent.toFixed(2)}%` : "N/A"}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          Quantity:
-                        </span>
-                        <span className="font-medium">{holding.quantity}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          Value:
-                        </span>
-                        <span className="font-medium">
-                          ${(holding.quantity * 100).toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          Day Change:
-                        </span>
-                        <span className="font-medium text-positive">+1.2%</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
 
               <Card className="border-zinc-800 bg-zinc-900">
                 <CardHeader className="pb-2">
@@ -312,28 +382,38 @@ export const DashboardPage = ({ initialPortfolios }: DashboardPageProps) => {
                       <th className="text-left p-4">Ticker</th>
                       <th className="text-left p-4">Name</th>
                       <th className="text-right p-4">Quantity</th>
+                      <th className="text-right p-4">Price</th>
                       <th className="text-right p-4">Value</th>
                       <th className="text-right p-4">Day Change</th>
-                      <th className="text-right p-4">Total Return</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedPortfolio?.holdings.map((holding, index) => (
-                      <tr
-                        key={holding.id}
-                        className="border-b border-zinc-800 hover:bg-zinc-800/50"
-                      >
-                        <td className="p-4">{index + 1}</td>
-                        <td className="p-4 font-medium">{holding.ticker}</td>
-                        <td className="p-4">{holding.ticker}</td>
-                        <td className="p-4 text-right">{holding.quantity}</td>
-                        <td className="p-4 text-right">
-                          ${(holding.quantity * 100).toLocaleString()}
-                        </td>
-                        <td className="p-4 text-right text-positive">+1.2%</td>
-                        <td className="p-4 text-right text-positive">+12.4%</td>
-                      </tr>
-                    ))}
+                    {selectedPortfolio?.holdings.map((holding, index) => {
+                      const stockData = stockPrices[holding.ticker];
+                      const value = holding.quantity * (stockData?.price || 0);
+                      const priceChangeColor = stockData ? (stockData.changePercent >= 0 ? "text-green-500" : "text-red-500") : "";
+
+                      return (
+                        <tr
+                          key={holding.id}
+                          className="border-b border-zinc-800 hover:bg-zinc-800/50"
+                        >
+                          <td className="p-4">{index + 1}</td>
+                          <td className="p-4 font-medium">{holding.ticker}</td>
+                          <td className="p-4">{stockData?.companyName || holding.ticker}</td>
+                          <td className="p-4 text-right">{holding.quantity}</td>
+                          <td className="p-4 text-right">
+                            ${stockData?.price?.toLocaleString() || "N/A"}
+                          </td>
+                          <td className="p-4 text-right">
+                            ${value.toLocaleString()}
+                          </td>
+                          <td className={`p-4 text-right ${priceChangeColor}`}>
+                            {stockData ? `${stockData.changePercent >= 0 ? "+" : ""}${stockData.changePercent.toFixed(2)}%` : "N/A"}
+                          </td>
+                        </tr>
+                      );
+                    })}
                     <tr className="hover:bg-zinc-800/50">
                       <td className="p-4">
                         {selectedPortfolio?.holdings.length + 1 || 0}
@@ -341,10 +421,10 @@ export const DashboardPage = ({ initialPortfolios }: DashboardPageProps) => {
                       <td className="p-4 font-medium">CASH</td>
                       <td className="p-4">USD</td>
                       <td className="p-4 text-right">-</td>
+                      <td className="p-4 text-right">-</td>
                       <td className="p-4 text-right">
                         ${selectedPortfolio?.cash.toLocaleString() || 0}
                       </td>
-                      <td className="p-4 text-right">-</td>
                       <td className="p-4 text-right">-</td>
                     </tr>
                   </tbody>
